@@ -1,33 +1,42 @@
 import express from "express";
 import cors from "cors";
+import mongoose from "mongoose";
 import { config } from "dotenv";
-import userRouter from "./routes/user/userRoute.js";
-import { authenticateToken } from "./middleware/authenticateToken.js";
-import microsoftRoute from "./routes/microsoft/microsoftRoute.js";
+import authRoutes from "./src/routes/authRoutes.js";
+
 config();
 
-export const SECRETKEY = process.env.JWT_SECRET_KEY;
-
 const app = express();
-const PORT = process.env.PORT;
+const PORT = process.env.PORT || 8000;
 
+// Middleware
 app.use(express.json());
 app.use(
   cors({
     origin: "*",
-    method: "GET,POST",
-    alllowedHeaders: "Content-Type,Authorization",
+    methods: "GET,POST",
+    allowedHeaders: "Content-Type,Authorization",
     optionsSuccessStatus: 200,
   })
 );
 
-app.listen(PORT, () => {
-  console.log("success on", PORT);
-});
+// MongoDB Connection
+mongoose
+  .connect(
+    "mongodb+srv://nitinsirsath8855:ZoqdUbsGGrD3Ps72@cluster0.bosvm.mongodb.net/mydatabase"
+  )
+  .then(() => {
+    console.log("MongoDB connected");
+    app.listen(PORT, () => {
+      console.log(`Server running on port ${PORT}`);
+    });
+  })
+  .catch((err) => console.error("Error connecting to MongoDB:", err));
 
-app.use("/api/user", userRouter);
-app.use("/api/report", authenticateToken, microsoftRoute);
+// Routes
+app.use("/api/auth", authRoutes);
 
+// Test Route
 app.get("/test", (req, res) => {
   return res.json({ message: "success on" });
 });
