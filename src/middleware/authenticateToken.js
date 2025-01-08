@@ -1,5 +1,5 @@
 import jwt from "jsonwebtoken";
-import { SECRETKEY } from "../index.js";
+import { SECRETKEY } from "../../index.js";
 
 let tokenBlacklist = []; // Maintain a blacklist of invalidated tokens
 

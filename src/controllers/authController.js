@@ -43,7 +43,7 @@ export const login = async (req, res) => {
     const user = await User.findOne({
       $or: [{ email: emailOrUsername }, { username: emailOrUsername }],
     });
-
+    console.log(user, "user");
     if (!user) {
       return res.status(404).json({ message: "User not found" });
     }
