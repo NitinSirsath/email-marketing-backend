@@ -4,6 +4,7 @@ import { config } from "dotenv";
 import emailRoutes from "./src/routes/email/emailRoutes.js";
 import connectDB from "./src/config/database.js";
 import authRoutes from "./src/routes/authRoutes.js";
+import agenda from "./src/config/agenda.js"; // Import agenda instance
 
 config();
 const app = express();
@@ -17,6 +18,16 @@ app.use(cors({ origin: "*", methods: "GET,POST" }));
 
 // Connect Database
 connectDB();
+
+// Start Agenda
+agenda
+  .start()
+  .then(() => {
+    console.log("Agenda started successfully");
+  })
+  .catch((error) => {
+    console.error("Error starting Agenda:", error.message);
+  });
 
 // Routes
 app.use("/api/auth", authRoutes);

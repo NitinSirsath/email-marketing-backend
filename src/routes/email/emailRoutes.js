@@ -7,7 +7,7 @@ import {
 
 const emailRoutes = express.Router();
 
-// Save sequence
+// Save sequence with email scheduling
 emailRoutes.post("/save", authenticateToken, saveSequence);
 
 // Get all sequences
