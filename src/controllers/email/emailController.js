@@ -2,36 +2,73 @@ import agenda from "../../config/agenda.js";
 import Sequence from "../../models/sequence.js";
 
 export const saveSequence = async (req, res) => {
-  const { nodes, email, scheduleTime } = req.body;
+  const { id, nodes, email, scheduleTime } = req.body;
   const userId = req.user.id;
 
   try {
-    if (!email || !scheduleTime) {
-      return res.status(400).json({
-        success: false,
-        message: "Email and schedule time are required",
+    let sequence;
+
+    if (id) {
+      // Update existing sequence
+      sequence = await Sequence.findOneAndUpdate(
+        { _id: id, userId },
+        { nodes, email, scheduleTime, updatedAt: new Date() },
+        { new: true }
+      );
+
+      if (!sequence) {
+        return res.status(404).json({
+          success: false,
+          message: "Sequence not found",
+        });
+      }
+
+      console.log("Updated sequence:", sequence);
+
+      // Cancel any existing jobs and reschedule
+      await agenda.cancel({ "data.sequenceId": id });
+      await agenda.schedule(new Date(scheduleTime), "sendEmail", {
+        sequenceId: id,
+        email,
+        subject: "Sequence Updated",
+        text: `Your sequence with ID ${id} has been updated and rescheduled.`,
+      });
+
+      console.log("Email rescheduled for sequence:", id);
+
+      return res.status(200).json({
+        success: true,
+        message: "Sequence updated successfully",
+        sequence,
+      });
+    } else {
+      // Create new sequence
+      sequence = new Sequence({ userId, nodes, email, scheduleTime });
+      await sequence.save();
+
+      console.log("Created new sequence:", sequence);
+
+      // Schedule the email job
+      await agenda.schedule(new Date(scheduleTime), "sendEmail", {
+        sequenceId: sequence._id,
+        email,
+        subject: "Sequence Created",
+        text: `Your sequence with ID ${sequence._id} has been scheduled.`,
+      });
+
+      console.log("Email scheduled for sequence:", sequence._id);
+
+      return res.status(201).json({
+        success: true,
+        message: "Sequence created successfully",
+        sequence,
       });
     }
-
-    const sequence = new Sequence({ userId, nodes, email, scheduleTime });
-    await sequence.save();
-
-    // Schedule the email job
-    await agenda.schedule(new Date(scheduleTime), "sendEmail", {
-      email,
-      subject: "Sequence Scheduled",
-      text: `Your sequence with ID ${sequence._id} has been scheduled.`,
-    });
-
-    res.status(200).json({
-      success: true,
-      message: "Sequence saved and email scheduled successfully",
-      sequence,
-    });
   } catch (err) {
+    console.error("Error saving sequence:", err.message);
     res.status(500).json({
       success: false,
-      message: "Failed to save sequence",
+      message: "Server error",
       error: err.message,
     });
   }
