@@ -1,36 +1,82 @@
 import agenda from "../../config/agenda.js";
 import Sequence from "../../models/sequence.js";
 
-// Save a new sequence
 export const saveSequence = async (req, res) => {
-  const { nodes, email, scheduleTime } = req.body; // Added scheduleTime to the request body
+  const { nodes, email, scheduleTime } = req.body;
   const userId = req.user.id;
 
   try {
-    // Validate scheduleTime
-    if (!scheduleTime) {
-      return res
-        .status(400)
-        .json({ success: false, message: "Schedule time is required" });
+    if (!email || !scheduleTime) {
+      return res.status(400).json({
+        success: false,
+        message: "Email and schedule time are required",
+      });
     }
 
-    // Save sequence to the database
-    const sequence = new Sequence({ userId, nodes });
+    const sequence = new Sequence({ userId, nodes, email, scheduleTime });
     await sequence.save();
-    console.log("calling save");
 
-    // Schedule an email job at the provided time
-    await agenda.schedule(scheduleTime, "sendEmail", {
+    // Schedule the email job
+    await agenda.schedule(new Date(scheduleTime), "sendEmail", {
       email,
-      subject: "New Sequence Saved",
-      text: `Your sequence with ID ${sequence._id} has been saved successfully.`,
+      subject: "Sequence Scheduled",
+      text: `Your sequence with ID ${sequence._id} has been scheduled.`,
     });
 
     res.status(200).json({
       success: true,
-      message: `Sequence saved and email scheduled at ${scheduleTime}`,
+      message: "Sequence saved and email scheduled successfully",
       sequence,
     });
+  } catch (err) {
+    res.status(500).json({
+      success: false,
+      message: "Failed to save sequence",
+      error: err.message,
+    });
+  }
+};
+
+// Get all sequences
+export const getSequences = async (req, res) => {
+  const userId = req.user.id;
+
+  try {
+    // Fetch all sequences for the user
+    const sequences = await Sequence.find({ userId }).select(
+      "_id nodes email scheduleTime createdAt updatedAt"
+    );
+    res.status(200).json({ success: true, sequences });
+  } catch (err) {
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch sequences",
+      error: err.message,
+    });
+  }
+};
+
+// Update sequence
+export const updateSequence = async (req, res) => {
+  const { id, nodes, scheduleTime } = req.body; // Extract ID from body
+  const userId = req.user.id;
+
+  try {
+    const sequence = await Sequence.findOneAndUpdate(
+      { _id: id, userId },
+      { nodes, updatedAt: new Date() },
+      { new: true }
+    );
+
+    if (!sequence) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Sequence not found" });
+    }
+
+    res
+      .status(200)
+      .json({ success: true, message: "Sequence updated", sequence });
   } catch (err) {
     res
       .status(500)
@@ -38,16 +84,39 @@ export const saveSequence = async (req, res) => {
   }
 };
 
-// Get all sequences for a user
-export const getSequences = async (req, res) => {
-  const userId = req.user.id;
+// Delete sequence
+export const deleteSequence = async (req, res) => {
+  const { sequenceId } = req.body;
+  console.log(sequenceId, "sequenceId");
+  console.log("Delete request received for sequenceId:", sequenceId);
 
   try {
-    const sequences = await Sequence.find({ userId });
-    res.status(200).json({ success: true, sequences });
+    const sequence = await Sequence.findOne({ _id: sequenceId });
+    console.log("Sequence found:", sequence);
+
+    if (!sequence) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Sequence not found" });
+    }
+
+    const now = new Date();
+    if (new Date(sequence.scheduleTime) < now) {
+      return res.status(400).json({
+        success: false,
+        message: "Cannot delete a sequence with a past schedule",
+      });
+    }
+
+    await Sequence.deleteOne({ _id: sequenceId });
+    console.log("Sequence deleted:", sequenceId);
+    res.status(200).json({ success: true, message: "Sequence deleted" });
   } catch (err) {
-    res
-      .status(500)
-      .json({ success: false, message: "Server error", error: err.message });
+    console.error("Error deleting sequence:", err.message);
+    res.status(500).json({
+      success: false,
+      message: "Failed to delete sequence",
+      error: err.message,
+    });
   }
 };

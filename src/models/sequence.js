@@ -8,6 +8,8 @@ const SequenceSchema = new mongoose.Schema(
       required: true,
     },
     nodes: { type: Array, required: true }, // Array of flowchart nodes
+    email: { type: String, required: true }, // Email associated with the sequence
+    scheduleTime: { type: Date, required: true }, // Scheduled time for the sequence
   },
   { timestamps: true }
 );
