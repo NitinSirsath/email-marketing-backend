@@ -2,10 +2,17 @@ import agenda from "../../config/agenda.js";
 import Sequence from "../../models/sequence.js";
 
 export const saveSequence = async (req, res) => {
-  const { id, nodes, email, scheduleTime } = req.body;
+  const { id, nodes, email, scheduleTime, emailBody } = req.body;
   const userId = req.user.id;
 
   try {
+    if (!email || !scheduleTime || !emailBody) {
+      return res.status(400).json({
+        success: false,
+        message: "Email, schedule time, and email body are required",
+      });
+    }
+
     let sequence;
 
     if (id) {
@@ -23,18 +30,14 @@ export const saveSequence = async (req, res) => {
         });
       }
 
-      console.log("Updated sequence:", sequence);
-
-      // Cancel any existing jobs and reschedule
+      // Cancel existing job and reschedule
       await agenda.cancel({ "data.sequenceId": id });
       await agenda.schedule(new Date(scheduleTime), "sendEmail", {
         sequenceId: id,
         email,
         subject: "Sequence Updated",
-        text: `Your sequence with ID ${id} has been updated and rescheduled.`,
+        html: emailBody, // Use emailBody sent from the frontend
       });
-
-      console.log("Email rescheduled for sequence:", id);
 
       return res.status(200).json({
         success: true,
@@ -46,17 +49,12 @@ export const saveSequence = async (req, res) => {
       sequence = new Sequence({ userId, nodes, email, scheduleTime });
       await sequence.save();
 
-      console.log("Created new sequence:", sequence);
-
-      // Schedule the email job
       await agenda.schedule(new Date(scheduleTime), "sendEmail", {
         sequenceId: sequence._id,
         email,
         subject: "Sequence Created",
-        text: `Your sequence with ID ${sequence._id} has been scheduled.`,
+        html: emailBody, // Use emailBody sent from the frontend
       });
-
-      console.log("Email scheduled for sequence:", sequence._id);
 
       return res.status(201).json({
         success: true,
