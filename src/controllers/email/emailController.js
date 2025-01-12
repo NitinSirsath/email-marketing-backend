@@ -1,5 +1,6 @@
 import agenda from "../../config/agenda.js";
 import Sequence from "../../models/sequence.js";
+import { DateTime } from "luxon";
 
 export const saveSequence = async (req, res) => {
   const { id, nodes, email, scheduleTime, emailBody } = req.body;
@@ -13,13 +14,17 @@ export const saveSequence = async (req, res) => {
       });
     }
 
+    const timeZone = "Asia/Kolkata"; // Desired timezone
+    const zonedTime = DateTime.fromISO(scheduleTime, { zone: timeZone });
+    const utcTime = zonedTime.toUTC(); // Convert to UTC for consistent storage
+
     let sequence;
 
     if (id) {
       // Update existing sequence
       sequence = await Sequence.findOneAndUpdate(
         { _id: id, userId },
-        { nodes, email, scheduleTime, updatedAt: new Date() },
+        { nodes, email, scheduleTime: utcTime.toISO(), updatedAt: new Date() },
         { new: true }
       );
 
@@ -30,13 +35,12 @@ export const saveSequence = async (req, res) => {
         });
       }
 
-      // Cancel existing job and reschedule
       await agenda.cancel({ "data.sequenceId": id });
-      await agenda.schedule(new Date(scheduleTime), "sendEmail", {
+      await agenda.schedule(utcTime.toJSDate(), "sendEmail", {
         sequenceId: id,
         email,
         subject: "Sequence Updated",
-        html: emailBody, // Use emailBody sent from the frontend
+        html: emailBody,
       });
 
       return res.status(200).json({
@@ -46,14 +50,19 @@ export const saveSequence = async (req, res) => {
       });
     } else {
       // Create new sequence
-      sequence = new Sequence({ userId, nodes, email, scheduleTime });
+      sequence = new Sequence({
+        userId,
+        nodes,
+        email,
+        scheduleTime: utcTime.toISO(),
+      });
       await sequence.save();
 
-      await agenda.schedule(new Date(scheduleTime), "sendEmail", {
+      await agenda.schedule(utcTime.toJSDate(), "sendEmail", {
         sequenceId: sequence._id,
         email,
         subject: "Sequence Created",
-        html: emailBody, // Use emailBody sent from the frontend
+        html: emailBody,
       });
 
       return res.status(201).json({
