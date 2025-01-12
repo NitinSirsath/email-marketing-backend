@@ -122,7 +122,6 @@ export const updateSequence = async (req, res) => {
 // Delete sequence
 export const deleteSequence = async (req, res) => {
   const { sequenceId } = req.body;
-  console.log(sequenceId, "sequenceId");
   console.log("Delete request received for sequenceId:", sequenceId);
 
   try {
@@ -135,14 +134,7 @@ export const deleteSequence = async (req, res) => {
         .json({ success: false, message: "Sequence not found" });
     }
 
-    const now = new Date();
-    if (new Date(sequence.scheduleTime) < now) {
-      return res.status(400).json({
-        success: false,
-        message: "Cannot delete a sequence with a past schedule",
-      });
-    }
-
+    // Proceed to delete the sequence regardless of schedule time
     await Sequence.deleteOne({ _id: sequenceId });
     console.log("Sequence deleted:", sequenceId);
     res.status(200).json({ success: true, message: "Sequence deleted" });
